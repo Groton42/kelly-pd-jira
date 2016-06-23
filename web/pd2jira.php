@@ -18,7 +18,7 @@ if ($messages) foreach ($messages->messages as $webhook) {
   error_log('Received webhook');
 
   switch ($webhook_type) {
-    case "incident.trigger" || "incident.resolve":
+    case "incident.assign" || "incident.resolve":
       //Die if the lock file is in use or if it's a trigger from JIRA
       if(file_exists('lock.txt') && file_get_contents('lock.txt') > (time() - 5)) {
         die('Should not run!');
@@ -46,7 +46,7 @@ if ($messages) foreach ($messages->messages as $webhook) {
       //Determine whether it's a trigger or resolve
       $verb = explode(".",$webhook_type)[1];
 
-      if ($verb == "trigger" && ($client == "JIRA" || substr($subject, 0, 6) === "[JIRA]")) die('Do not trigger a new JIRA issue based on an existing JIRA issue.');
+      if ($verb == "assign" && ($client == "JIRA" || substr($subject, 0, 6) === "[JIRA]")) die('Do not trigger a new JIRA issue based on an existing JIRA issue.');
       error_log("substr:" . $subject);
       //Let's make sure the note wasn't already added (Prevents a 2nd Jira ticket in the event the first request takes long enough to not succeed according to PagerDuty)
       $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
@@ -57,7 +57,7 @@ if ($messages) foreach ($messages->messages as $webhook) {
           $notes_data = array();
           foreach ($response['notes'] as $value) {
             $startsWith = "JIRA ticket";
-            if (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "trigger") {
+            if (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "assign") {
               break 2; //Skip it cause it would be a duplicate
             }
             //Extract the JIRA issue ID for incidents that did not originate in JIRA
@@ -76,7 +76,7 @@ if ($messages) foreach ($messages->messages as $webhook) {
       $base_url = "$jira_url/rest/api/2/issue/";
 
       //Build the data JSON blobs to be sent to JIRA
-      if ($verb == "trigger") {
+      if ($verb == "assign") {
         $note_verb = "created";
         $data = array('fields'=>array('project'=>array('key'=>"$jira_project"),'summary'=>"$summary",'description'=>"A new PagerDuty ticket as been created.  {$trigger_summary_data}. Please go to $ticket_url to view it.", 'issuetype'=>array('name'=>"$jira_issue_type")));
         post_to_jira($data, $base_url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);

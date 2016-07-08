@@ -15,105 +15,110 @@ $pd_api_token = getenv('PAGERDUTY_API_TOKEN');
 
 if ($messages) {
   // logic to check whether the webhook came from PD
-  if (property_exists($messages, 'messages')) {
-    foreach ($messages->messages as $webhook) {
-      $webhook_type = $webhook->type;
-      error_log('Received webhook');
+  switch (property_exists($messages, 'messages')) {
+    case true:
+      foreach ($messages->messages as $webhook) {
+        $webhook_type = $webhook->type;
+        error_log('Received webhook');
 
-      switch ($webhook_type) {
-        case "incident.assign" || "incident.resolve":
-          //Die if the lock file is in use or if it's a trigger from JIRA
-          if(file_exists('lock.txt') && file_get_contents('lock.txt') > (time() - 5)) {
-            die('Should not run!');
-            error_log("Already running.  Killing duplicate process.");
-          }
-          //Extract values from the PagerDuty webhook
-          file_put_contents('lock.txt', time());
-          $incident_id = $webhook->data->incident->id;
-          $incident_number = $webhook->data->incident->incident_number;
-          $ticket_url = $webhook->data->incident->html_url;
-          $pd_requester_id = $webhook->data->incident->assigned_to_user->id;
-          $service_name = $webhook->data->incident->service->name;
-          $jira_issue_id = $webhook->data->incident->incident_key;
-          $assignee = $webhook->data->incident->assigned_to_user->name;
-          if ($webhook->data->incident->trigger_summary_data->description) {
-            $trigger_summary_data = $webhook->data->incident->trigger_summary_data->description;
-          }
-          else {
-            $trigger_summary_data = $webhook->data->incident->trigger_summary_data->subject;
-          }
-          $client = $webhook->data->incident->trigger_summary_data->client;
-          $subject = $webhook->data->incident->trigger_summary_data->subject;
-          $summary = "PagerDuty Service: $service_name, Incident #$incident_number, Summary: $trigger_summary_data";
+        switch ($webhook_type) {
+          case "incident.assign" || "incident.resolve":
+            //Die if the lock file is in use or if it's a trigger from JIRA
+            if(file_exists('lock.txt') && file_get_contents('lock.txt') > (time() - 5)) {
+              die('Should not run!');
+              error_log("Already running.  Killing duplicate process.");
+            }
+            //Extract values from the PagerDuty webhook
+            file_put_contents('lock.txt', time());
+            $incident_id = $webhook->data->incident->id;
+            $incident_number = $webhook->data->incident->incident_number;
+            $ticket_url = $webhook->data->incident->html_url;
+            $pd_requester_id = $webhook->data->incident->assigned_to_user->id;
+            $service_name = $webhook->data->incident->service->name;
+            $jira_issue_id = $webhook->data->incident->incident_key;
+            $assignee = $webhook->data->incident->assigned_to_user->name;
+            if ($webhook->data->incident->trigger_summary_data->description) {
+              $trigger_summary_data = $webhook->data->incident->trigger_summary_data->description;
+            }
+            else {
+              $trigger_summary_data = $webhook->data->incident->trigger_summary_data->subject;
+            }
+            $client = $webhook->data->incident->trigger_summary_data->client;
+            $subject = $webhook->data->incident->trigger_summary_data->subject;
+            $summary = "PagerDuty Service: $service_name, Incident #$incident_number, Summary: $trigger_summary_data";
 
-          //Determine whether it's a trigger or resolve
-          $verb = explode(".",$webhook_type)[1];
+            //Determine whether it's a trigger or resolve
+            $verb = explode(".",$webhook_type)[1];
 
-          if ($verb == "assign" && ($client == "JIRA" || substr($subject, 0, 6) === "[JIRA]")) die('Do not trigger a new JIRA issue based on an existing JIRA issue.');
-          error_log("substr:" . $subject);
-          //Let's make sure the note wasn't already added (Prevents a 2nd Jira ticket in the event the first request takes long enough to not succeed according to PagerDuty)
-          $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
-          $return = http_request($url, "", "GET", "token", "", $pd_api_token);
-          if ($return['status_code'] == '200') {
-            $response = json_decode($return['response'], true);
-            if (array_key_exists("notes", $response)) {
-              $notes_data = array();
-              foreach ($response['notes'] as $value) {
-                $startsWith = "JIRA ticket";
-                if (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "assign") {
-                  break 2; //Skip it cause it would be a duplicate
+            if ($verb == "assign" && ($client == "JIRA" || substr($subject, 0, 6) === "[JIRA]")) die('Do not trigger a new JIRA issue based on an existing JIRA issue.');
+            error_log("substr:" . $subject);
+            //Let's make sure the note wasn't already added (Prevents a 2nd Jira ticket in the event the first request takes long enough to not succeed according to PagerDuty)
+            $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
+            $return = http_request($url, "", "GET", "token", "", $pd_api_token);
+            if ($return['status_code'] == '200') {
+              $response = json_decode($return['response'], true);
+              if (array_key_exists("notes", $response)) {
+                $notes_data = array();
+                foreach ($response['notes'] as $value) {
+                  $startsWith = "JIRA ticket";
+                  if (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "assign") {
+                    break 2; //Skip it cause it would be a duplicate
+                  }
+                  //Extract the JIRA issue ID for incidents that did not originate in JIRA
+                  elseif (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "resolve") {
+                    preg_match('/JIRA ticket (.*) has.*/', $value['content'], $m);
+                    $jira_issue_id = $m[1];
+                   }
+                   else {
+                     // Concat all the non-ack notes
+                     $notes_data[] = $value['content'];
+                   }
                 }
-                //Extract the JIRA issue ID for incidents that did not originate in JIRA
-                elseif (substr($value['content'], 0, strlen($startsWith)) === $startsWith && $verb == "resolve") {
-                  preg_match('/JIRA ticket (.*) has.*/', $value['content'], $m);
-                  $jira_issue_id = $m[1];
-                 }
-                 else {
-                   // Concat all the non-ack notes
-                   $notes_data[] = $value['content'];
-                 }
               }
             }
-          }
 
-          $base_url = "$jira_url/rest/api/2/issue/";
+            $base_url = "$jira_url/rest/api/2/issue/";
 
-          //Build the data JSON blobs to be sent to JIRA
-          if ($verb == "assign") {
-            $note_verb = "created";
-            $data = array('fields'=>array('project'=>array('key'=>"$jira_project"),'summary'=>"$summary",'description'=>"A new PagerDuty ticket as been created.  {$trigger_summary_data}. Please go to $ticket_url to view it.", 'issuetype'=>array('name'=>"$jira_issue_type")));
-            post_to_jira($data, $base_url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
-          }
-          elseif ($verb == "resolve") {
-            $note_verb = "closed";
-            $url = $base_url . $jira_issue_id . "/transitions";
-            $data = array('update'=>array('comment'=>array(array('add'=>array('body'=>"PagerDuty incident #$incident_number has been resolved.")))),'transition'=>array('id'=>"$jira_transition_id"));
-            post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
-            // When an incident is resolved, add all notes from PagerDuty to the Jira ticket
-            $url = $base_url . $jira_issue_id . "/comment";
-            foreach ($notes_data as $note) {
-              $data = array('body'=>"$note");
-              post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
+            //Build the data JSON blobs to be sent to JIRA
+            if ($verb == "assign") {
+              $note_verb = "created";
+              $data = array('fields'=>array('project'=>array('key'=>"$jira_project"),'summary'=>"$summary",'description'=>"A new PagerDuty ticket as been created.  {$trigger_summary_data}. Please go to $ticket_url to view it.", 'issuetype'=>array('name'=>"$jira_issue_type")));
+              post_to_jira($data, $base_url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
             }
-          }
+            elseif ($verb == "resolve") {
+              $note_verb = "closed";
+              $url = $base_url . $jira_issue_id . "/transitions";
+              $data = array('update'=>array('comment'=>array(array('add'=>array('body'=>"PagerDuty incident #$incident_number has been resolved.")))),'transition'=>array('id'=>"$jira_transition_id"));
+              post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
+              // When an incident is resolved, add all notes from PagerDuty to the Jira ticket
+              $url = $base_url . $jira_issue_id . "/comment";
+              foreach ($notes_data as $note) {
+                $data = array('body'=>"$note");
+                post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
+              }
+            }
 
-          break;
-        default:
-          continue;
+            break;
+          default:
+            continue;
+        }
       }
-    }
-  }
-  else {
-    // Reflect Jira comment update in PD
-    $webhook_type = $messages->webhookEvent;
-    switch ($webhook_type) {
-      case "comment_created":
-        $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
-        $comment_body = $messages->body;
-        $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
-        $data_json = json_encode($data);
-        http_request($url, $data_json, "POST", "token", "", $pd_api_token);    
-    }
+      break;
+    case false:
+      error_log('received jira webhook');
+      // Reflect Jira comment update in PD
+      $webhook_type = $messages->webhookEvent;
+      switch ($webhook_type) {
+        case "comment_created":
+          $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
+          $comment_body = $messages->body;
+          $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
+          $data_json = json_encode($data);
+          http_request($url, $data_json, "POST", "token", "", $pd_api_token);
+      }
+      break;
+    default:
+      continue;
   }
 }
 

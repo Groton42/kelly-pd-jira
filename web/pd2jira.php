@@ -13,6 +13,9 @@ $jira_transition_id = getenv('JIRA_TRANSITION_ID');
 $pd_subdomain = getenv('PAGERDUTY_SUBDOMAIN');
 $pd_api_token = getenv('PAGERDUTY_API_TOKEN');
 
+$incident_id = "not_real";
+$pd_requester_id = "for_testing_only";
+
 if ($messages) {
   // logic to check whether the webhook came from PD
   switch (property_exists($messages, 'messages')) {

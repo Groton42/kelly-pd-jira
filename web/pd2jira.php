@@ -122,7 +122,7 @@ if ($messages) {
           $comment_body = $messages->body;
           $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
           $data_json = json_encode($data);
-          error_log("Payload:\n");
+          error_log("Payload:");
           error_log($data_json);
           http_request($url, $data_json, "POST", "token", "", $pd_api_token);
       }
@@ -131,6 +131,16 @@ if ($messages) {
       continue;
   }
 }
+
+50:06 UTC] received jira webhook
+2016-07-08T21:50:06.399077+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC] Running comment_created case...
+2016-07-08T21:50:06.399938+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC]
+2016-07-08T21:50:06.400045+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC] foobar
+2016-07-08T21:50:06.400249+00:00 app[web.1]:
+2016-07-08T21:50:06.400132+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC] URL: https://pdt-lucas.pagerduty.com/api/v1/incidents//notes
+2016-07-08T21:50:06.400219+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC] Payload:
+2016-07-08T21:50:06.400001+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC]
+2016-07-08T21:50:06.400322+00:00 app[web.1]: [08-Jul-2016 21:50:06 UTC] {"note":{"content":""},"requester_id":""}
 
 function post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token) {
   $data_json = json_encode($data);

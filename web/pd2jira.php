@@ -108,9 +108,10 @@ if ($messages) {
       error_log('received jira webhook');
       // Reflect Jira comment update in PD
       $webhook_type = $messages->webhookEvent;
-      error_log('Webhook type: ' . $webhook_type);
       switch ($webhook_type) {
         case "comment_created":
+          error_log("Running comment_created case...");
+          error_log($url);
           $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
           error_log("URL: " . $url);
           $comment_body = $messages->body;

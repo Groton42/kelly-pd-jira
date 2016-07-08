@@ -111,7 +111,9 @@ if ($messages) {
       switch ($webhook_type) {
         case "comment_created":
           error_log("Running comment_created case...");
-          error_log($url);
+          error_log($incident_id);
+          error_log($pd_requester_id);
+          error_log("foobar");
           $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
           error_log("URL: " . $url);
           $comment_body = $messages->body;

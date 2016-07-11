@@ -113,13 +113,14 @@ if ($messages) {
       $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
       $response = json_decode($return['response']);
       preg_match("/(?<=incidents\/)(.{7})/", $response->fields->description, $matches);
-      error_log($matches[0]);
       $incident_id = $matches[0];
       // Extract the PD requester ID
       $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id";
       $return = http_request($url, "", "GET", "token", "", $pd_api_token);
+      error_log($return['status_code']);
       if ($return['status_code'] == '200') {
         $response = json_decode($return['response'], true);
+        error_log(json_encode($response));
         $pd_requester_id = $response->assigned_to_user->id;
       }
       // Reflect Jira comment update in PD

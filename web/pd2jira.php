@@ -106,14 +106,13 @@ if ($messages) {
       break;
     case false:
       error_log('received jira webhook');
-      error_log($messages);
       // Extract the PD incident ID
       $jira_issue_url = $messages->comment->self;
       $jira_comment_id = $messages->comment->id;
       $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id));
       $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
-      $status_code = $return['status_code'];
-      $response = $return['response'];
+      error_log($return);
+      $response = json_decode($return['response'], true);
       foreach ($response->comments as $comment) {
         if (substr($comment->body, 0, 38) == "A new PagerDuty ticket as been created") {
           preg_match("/incidents\/(.{7})/", $comment->body, $matches);

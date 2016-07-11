@@ -13,9 +13,6 @@ $jira_transition_id = getenv('JIRA_TRANSITION_ID');
 $pd_subdomain = getenv('PAGERDUTY_SUBDOMAIN');
 $pd_api_token = getenv('PAGERDUTY_API_TOKEN');
 
-$incident_id = "not_real";
-$pd_requester_id = "for_testing_only";
-
 if ($messages) {
   // logic to check whether the webhook came from PD
   switch (property_exists($messages, 'messages')) {
@@ -109,6 +106,31 @@ if ($messages) {
       break;
     case false:
       error_log('received jira webhook');
+      error_log($messages);
+      // Extract the PD incident ID
+      $jira_issue_url = $messages->comment->self;
+      $jira_comment_id = $messages->comment->id;
+      $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id));
+      $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
+      $status_code = $return['status_code'];
+      $response = $return['response'];
+      foreach ($response->comments as $comment) {
+        if (substr($comment->body, 0, 38) == "A new PagerDuty ticket as been created") {
+          preg_match("/incidents\/(.{7})/", $comment->body, $matches);
+          $incident_id = $matches[0];
+          break;
+        }
+        else {
+          error_log(substr($comment->body, 0, 38));
+        }
+      }
+      // Extract the PD requester ID
+      $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id";
+      $return = http_request($url, "", "GET", "token", "", $pd_api_token);
+      if ($return['status_code'] == '200') {
+        $response = json_decode($return['response'], true);
+        $pd_requester_id = $response->assigned_to_user->id;
+      }
       // Reflect Jira comment update in PD
       $webhook_type = $messages->webhookEvent;
       switch ($webhook_type) {
@@ -119,7 +141,7 @@ if ($messages) {
           error_log("foobar");
           $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
           error_log("URL: " . $url);
-          $comment_body = $messages->body;
+          $comment_body = $messages->comment->body;
           $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
           $data_json = json_encode($data);
           error_log("Payload:");

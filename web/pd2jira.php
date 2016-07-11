@@ -112,7 +112,7 @@ if ($messages) {
       $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id) - 8);
       $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
       $response = json_decode($return['response']);
-      preg_match("/incidents\/(.{7})/", $response->fields->description, $matches);
+      preg_match("/(?<=incidents\/)(.{7})/", $response->fields->description, $matches);
       error_log($matches[0]);
       $incident_id = $matches[0];
       // Extract the PD requester ID

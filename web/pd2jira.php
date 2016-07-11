@@ -109,20 +109,12 @@ if ($messages) {
       // Extract the PD incident ID
       $jira_issue_url = $messages->comment->self;
       $jira_comment_id = $messages->comment->id;
-      $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id));
+      $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id) - 8);
       $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
       $response = json_decode($return['response']);
-      error_log(json_encode($response));
-      foreach ($response->comments as $comment) {
-        if (substr($comment->body, 0, 38) == "A new PagerDuty ticket as been created") {
-          preg_match("/incidents\/(.{7})/", $comment->body, $matches);
-          $incident_id = $matches[0];
-          break;
-        }
-        else {
-          error_log(substr($comment->body, 0, 38));
-        }
-      }
+      preg_match("/incidents\/(.{7})/", $response->fields->description, $matches);
+      error_log($matches[0]);
+      $incident_id = $matches[0];
       // Extract the PD requester ID
       $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id";
       $return = http_request($url, "", "GET", "token", "", $pd_api_token);

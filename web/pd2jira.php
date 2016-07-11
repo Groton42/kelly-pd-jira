@@ -120,8 +120,7 @@ if ($messages) {
       error_log($return['status_code']);
       if ($return['status_code'] == '200') {
         $response = json_decode($return['response'], true);
-        error_log(json_encode($response));
-        $pd_requester_id = $response->assigned_to_user->id;
+        $pd_requester_id = $response->incident->assignments->assignee->id;
       }
       // Reflect Jira comment update in PD
       $webhook_type = $messages->webhookEvent;

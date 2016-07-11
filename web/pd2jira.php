@@ -119,7 +119,7 @@ if ($messages) {
       $return = http_request($url, "", "GET", "token", "", $pd_api_token);
       if ($return['status_code'] == '200') {
         $response = json_decode($return['response'], true);
-        error_log(json_encode($response));
+        error_log(json_encode($response->incident->assignments[0]));
         $pd_requester_id = $response->incident->assignments[0]->assignee->id;
         error_log($pd_requester_id);
       }

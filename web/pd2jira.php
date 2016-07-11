@@ -111,8 +111,8 @@ if ($messages) {
       $jira_comment_id = $messages->comment->id;
       $url = substr($jira_issue_url, 0, strlen($jira_issue_url) - strlen($jira_comment_id));
       $return = http_request($url, "", "GET", "basic", $jira_username, $jira_password);
-      error_log($return);
-      $response = json_decode($return['response'], true);
+      $response = json_decode($return['response']);
+      error_log(json_encode($response));
       foreach ($response->comments as $comment) {
         if (substr($comment->body, 0, 38) == "A new PagerDuty ticket as been created") {
           preg_match("/incidents\/(.{7})/", $comment->body, $matches);

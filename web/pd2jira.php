@@ -117,7 +117,6 @@ if ($messages) {
       // Extract the PD requester ID
       $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id";
       $return = http_request($url, "", "GET", "token", "", $pd_api_token);
-      error_log($return['status_code']);
       if ($return['status_code'] == '200') {
         $response = json_decode($return['response'], true);
         $pd_requester_id = $response->incident->assignments->assignee->id;
@@ -127,17 +126,13 @@ if ($messages) {
       switch ($webhook_type) {
         case "comment_created":
           error_log("Running comment_created case...");
-          error_log($incident_id);
-          error_log($pd_requester_id);
-          error_log("foobar");
           $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
-          error_log("URL: " . $url);
           $comment_body = $messages->comment->body;
           $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
           $data_json = json_encode($data);
-          error_log("Payload:");
-          error_log($data_json);
-          http_request($url, $data_json, "POST", "token", "", $pd_api_token);
+          error_log(json_encode($data_json));
+          $return = http_request($url, $data_json, "POST", "token", "", $pd_api_token);
+          error_log(json_encode($return['response']));
       }
       break;
     default:

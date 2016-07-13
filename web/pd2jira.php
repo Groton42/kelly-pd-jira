@@ -91,11 +91,11 @@ if ($messages) {
               $data = array('update'=>array('comment'=>array(array('add'=>array('body'=>"PagerDuty incident #$incident_number has been resolved.")))),'transition'=>array('id'=>"$jira_transition_id"));
               post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
               // When an incident is resolved, add all notes from PagerDuty to the Jira ticket
-              $url = $base_url . $jira_issue_id . "/comment";
-              foreach ($notes_data as $note) {
-                $data = array('body'=>"$note");
-                post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
-              }
+              // $url = $base_url . $jira_issue_id . "/comment";
+              // foreach ($notes_data as $note) {
+              //   $data = array('body'=>"$note");
+              //   post_to_jira($data, $url, $jira_username, $jira_password, $pd_subdomain, $incident_id, $note_verb, $jira_url, $pd_requester_id, $pd_api_token);
+              // }
             }
 
             break;
@@ -105,7 +105,6 @@ if ($messages) {
       }
       break;
     case false:
-      error_log('received jira webhook');
       // Extract the PD incident ID
       $jira_issue_url = $messages->comment->self;
       $jira_comment_id = $messages->comment->id;
@@ -119,22 +118,17 @@ if ($messages) {
       $return = http_request($url, "", "GET", "token", "", $pd_api_token);
       if ($return['status_code'] == '200') {
         $response = json_decode($return['response']);
-        error_log(json_encode($response->incident));
         $pd_requester_id = $response->incident->assignments[0]->assignee->id;
-        error_log($pd_requester_id);
       }
       // Reflect Jira comment update in PD
       $webhook_type = $messages->webhookEvent;
       switch ($webhook_type) {
         case "comment_created":
-          error_log("Running comment_created case...");
           $url = "https://$pd_subdomain.pagerduty.com/api/v1/incidents/$incident_id/notes";
           $comment_body = $messages->comment->body;
           $data = array('note'=>array('content'=>"$comment_body"),'requester_id'=>"$pd_requester_id");
           $data_json = json_encode($data);
-          error_log(json_encode($data_json));
           $return = http_request($url, $data_json, "POST", "token", "", $pd_api_token);
-          error_log(json_encode($return['response']));
       }
       break;
     default:
